@@ -31,10 +31,11 @@ app.get("/ping", async (req: Request, res: Response) => {
 
 app.get("/bands", async (req: Request, res: Response) => {
     try {
-        const result = await db.raw(`
-            SELECT * FROM bands;
-        `)
+        // const result = await db.raw(`
+        //     SELECT * FROM bands;
+        // `)
 
+        const result = await db("bands")
         res.status(200).send(result)
     } catch (error) {
         console.log(error)
@@ -71,10 +72,15 @@ app.post("/bands", async (req: Request, res: Response) => {
             throw new Error("'id' e 'name' devem possuir no mínimo 1 caractere")
         }
 
-        await db.raw(`
-            INSERT INTO bands (id, name)
-            VALUES ("${id}", "${name}");
-        `)
+        // await db.raw(`
+        //     INSERT INTO bands (id, name)
+        //     VALUES ("${id}", "${name}");
+        // `)
+
+        await db.insert({
+            id: id,
+            name: name
+        }).into("bands")
 
         res.status(200).send("Banda cadastrada com sucesso")
     } catch (error) {
@@ -125,20 +131,28 @@ app.put("/bands/:id", async (req: Request, res: Response) => {
             }
         }
 
-        const [ band ] = await db.raw(`
-            SELECT * FROM bands
-            WHERE id = "${idToEdit}";
-        `) // desestruturamos para encontrar o primeiro item do array
+        const [ band ] = await db("bands").where({id: idToEdit})
+        
+        // .raw(`
+        //     SELECT * FROM bands
+        //     WHERE id = "${idToEdit}";
+        // `) // desestruturamos para encontrar o primeiro item do array
 
         if (band) {
-            await db.raw(`
-                UPDATE bands
-                SET
-                    id = "${newId || band.id}",
-                    name = "${newName || band.name}"
-                WHERE
-                    id = "${idToEdit}";
-            `)
+            // await db.raw(`
+            //     UPDATE bands
+            //     SET
+            //         id = "${newId || band.id}",
+            //         name = "${newName || band.name}"
+            //     WHERE
+            //         id = "${idToEdit}";
+            // `)
+            const updateBands = {
+                id: newId || band.id,
+                name: newName || band.name
+            }
+
+            await db("bands").update(updateBands).where({ id: idToEdit})
         } else {
             res.status(404)
             throw new Error("'id' não encontrada")
@@ -160,11 +174,45 @@ app.put("/bands/:id", async (req: Request, res: Response) => {
     }
 })
 
+app.delete('/bands/:id', async (req: Request, res: Response) => {
+    try{
+        const { id } = req.params
+
+        if(!id){
+            res.status(407)
+            throw new Error("É necessário informar um id.")
+        }
+        
+        const [bandExist] = await db("bands").where({ id: id})
+
+        if(bandExist){
+            await db("bands").del().where({id: id})
+            res.status(200).send("Banda excluída.")
+        } else {
+            res.status(404)
+            throw new Error("Banda não encontrada")
+        }
+    } catch(error){
+        console.log(error)
+
+        if (req.statusCode === 200) {
+            res.status(500)
+        }
+
+        if (error instanceof Error) {
+            res.send(error.message)
+        } else {
+            res.send("Erro inesperado")
+        }
+    }
+})
+
 app.get("/songs", async (req: Request, res: Response) => {
     try {
-        const result = await db.raw(`
-            SELECT * FROM songs;
-        `)
+        // const result = await db.raw(`
+        //     SELECT * FROM songs;
+        // `)
+        const result = await db("songs")
 
         res.status(200).send(result)
     } catch (error) {
@@ -208,11 +256,17 @@ app.post("/songs", async (req: Request, res: Response) => {
             throw new Error("'id', 'name' e 'bandId' devem possuir no mínimo 1 caractere")
         }
 
-        await db.raw(`
-            INSERT INTO songs (id, name, band_id)
-            VALUES ("${id}", "${name}", "${bandId}");
-        `)
+        // await db.raw(`
+        //     INSERT INTO songs (id, name, band_id)
+        //     VALUES ("${id}", "${name}", "${bandId}");
+        // `)
+        const newSongs = {
+            id,
+            name,
+            band_id: bandId
+        }
 
+        await db("songs").insert(newSongs)
         res.status(200).send("Música cadastrada com sucesso")
     } catch (error) {
         console.log(error)
@@ -276,21 +330,29 @@ app.put("/songs/:id", async (req: Request, res: Response) => {
             }
         }
 
-        const [ song ] = await db.raw(`
-            SELECT * FROM songs
-            WHERE id = "${idToEdit}";
-        `) // desestruturamos para encontrar o primeiro item do array
+        // const [ song ] = await db.raw(`
+        //     SELECT * FROM songs
+        //     WHERE id = "${idToEdit}";
+        // `) // desestruturamos para encontrar o primeiro item do array
+        const [song] = await db("songs").where({ id: idToEdit})
 
         if (song) {
-            await db.raw(`
-                UPDATE songs
-                SET
-                    id = "${newId || song.id}",
-                    name = "${newName || song.name}",
-                    band_id = "${newBandId || song.band_id}"
-                WHERE
-                    id = "${idToEdit}";
-            `)
+            // await db.raw(`
+            //     UPDATE songs
+            //     SET
+            //         id = "${newId || song.id}",
+            //         name = "${newName || song.name}",
+            //         band_id = "${newBandId || song.band_id}"
+            //     WHERE
+            //         id = "${idToEdit}";
+            // `)
+            const updateSong = {
+                id: newId || song.id,
+                name: newName || song.name,
+                band_id: newBandId || song.band_id
+            }
+
+            await db("songs").update(updateSong).where({ id: idToEdit})
         } else {
             res.status(404)
             throw new Error("'id' não encontrada")
@@ -298,6 +360,72 @@ app.put("/songs/:id", async (req: Request, res: Response) => {
 
         res.status(200).send({ message: "Atualização realizada com sucesso" })
     } catch (error) {
+        console.log(error)
+
+        if (req.statusCode === 200) {
+            res.status(500)
+        }
+
+        if (error instanceof Error) {
+            res.send(error.message)
+        } else {
+            res.send("Erro inesperado")
+        }
+    }
+})
+
+app.delete('/songs/:id', async (req: Request, res: Response) => {
+    try{
+        const { id } = req.params
+
+        if(!id){
+            res.status(407)
+            throw new Error("É necessário informar um id.")
+        }
+        
+        const [songExist] = await db("songs").where({ id: id})
+
+        if(songExist){
+            await db("songs").del().where({id: id})
+            res.status(200).send("Música excluída.")
+        } else {
+            res.status(404)
+            throw new Error("Música não encontrada")
+        }
+    } catch(error){
+        console.log(error)
+
+        if (req.statusCode === 200) {
+            res.status(500)
+        }
+
+        if (error instanceof Error) {
+            res.send(error.message)
+        } else {
+            res.send("Erro inesperado")
+        }
+    }
+})
+
+app.get("/songs/search", async (req: Request, res: Response) => {
+    try{
+        const q = req.query.q as string
+
+        if(!q){
+            res.status(400)
+            throw new Error("Insira dados de pesquisa.")
+        }
+
+        const getSong = await db("songs").where("name", "LIKE", `%${q}%`)
+
+        if(getSong){
+            res.status(200).send(getSong)
+        } else{ 
+            res.status(404)
+            throw new Error("Música não encontrada.")
+        }
+
+    } catch(error){
         console.log(error)
 
         if (req.statusCode === 200) {
